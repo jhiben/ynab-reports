@@ -33,14 +33,13 @@ body {
 /* Target Proportions Report */
 .report-layout {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
   align-items: start;
 }
 
 .chart-container {
-  max-width: 450px;
-  margin: 0 auto;
+  max-width: 280px;
 }
 
 .table-container {
@@ -54,6 +53,15 @@ body {
   height: 14px;
   border-radius: 3px;
   vertical-align: middle;
+}
+
+.table-container tbody tr[data-index] {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.table-container tbody tr.highlight {
+  background-color: rgba(13, 110, 253, 0.12) !important;
 }
 
 @media (max-width: 768px) {

@@ -146,7 +146,27 @@ public class TargetProportionCalculator
         return BuildItems(groupTotals);
     }
 
-    private static List<TargetProportionItem> BuildItems(IEnumerable<(string Name, long Total)> items)
+    /// <summary>
+    /// Builds subcategory-level proportion items for a single category group.
+    /// </summary>
+    public List<TargetProportionItem> CalculateSubcategoryProportionsForGroup(
+        List<CategoryGroupWithCategories> groups, string groupName)
+    {
+        var filtered = ApplyExclusions(groups);
+        var group = filtered.FirstOrDefault(g =>
+            g.Name.Equals(groupName, StringComparison.OrdinalIgnoreCase));
+
+        if (group is null) return [];
+
+        var items = group.Categories
+            .Select(c => (c.Name, Monthly: NormalizeToMonthly(c)))
+            .Where(x => x.Monthly.HasValue)
+            .Select(x => (x.Name, Total: x.Monthly!.Value));
+
+        return BuildItems(items);
+    }
+
+    private List<TargetProportionItem> BuildItems(IEnumerable<(string Name, long Total)> items)
     {
         var list = items.ToList();
 
@@ -154,14 +174,23 @@ public class TargetProportionCalculator
         decimal total = list.Sum(i => i.Total) / 1000m;
         if (total == 0) return [];
 
+        var hourlyRate = _reportOptions.CurrentValue.HourlyRate;
+        var monthlyIncome = _reportOptions.CurrentValue.MonthlyIncome;
+
         return list
             .OrderByDescending(i => i.Total)
-            .Select((item, index) => new TargetProportionItem
+            .Select((item, index) =>
             {
-                Name = item.Name,
-                TargetAmount = item.Total / 1000m,
-                Percentage = Math.Round(item.Total / 1000m / total * 100m, 1),
-                Color = ChartColors[index % ChartColors.Length]
+                var amount = item.Total / 1000m;
+                return new TargetProportionItem
+                {
+                    Name = item.Name,
+                    TargetAmount = amount,
+                    HoursOfLife = hourlyRate > 0 ? Math.Round(amount / hourlyRate, 1) : 0,
+                    PercentageOfIncome = monthlyIncome > 0 ? Math.Round(amount / monthlyIncome * 100m, 1) : 0,
+                    Percentage = Math.Round(amount / total * 100m, 1),
+                    Color = ChartColors[index % ChartColors.Length]
+                };
             })
             .ToList();
     }

@@ -18,6 +18,9 @@ public class TargetProportionsModel : PageModel
     [BindProperty(SupportsGet = true)]
     public bool GroupByCategory { get; set; }
 
+    [BindProperty(SupportsGet = true)]
+    public string? CategoryGroup { get; set; }
+
     public TargetProportionsModel(IYnabApiClient ynabClient, TargetProportionCalculator calculator)
     {
         _ynabClient = ynabClient;
@@ -43,14 +46,18 @@ public class TargetProportionsModel : PageModel
         Report.BudgetId = BudgetId;
         Report.BudgetName = Report.Budgets.FirstOrDefault(b => b.Id == BudgetId)?.Name ?? "Unknown";
         Report.GroupedByCategory = GroupByCategory;
+        Report.CategoryGroupName = CategoryGroup;
 
         var categoryGroups = await _ynabClient.GetCategoriesAsync(BudgetId);
 
-        Report.Items = GroupByCategory
-            ? _calculator.CalculateCategoryGroupProportions(categoryGroups)
-            : _calculator.CalculateSubcategoryProportions(categoryGroups);
+        Report.Items = !string.IsNullOrEmpty(CategoryGroup)
+            ? _calculator.CalculateSubcategoryProportionsForGroup(categoryGroups, CategoryGroup)
+            : GroupByCategory
+                ? _calculator.CalculateCategoryGroupProportions(categoryGroups)
+                : _calculator.CalculateSubcategoryProportions(categoryGroups);
 
         Report.TotalTarget = Report.Items.Sum(i => i.TargetAmount);
+        Report.TotalHoursOfLife = Report.Items.Sum(i => i.HoursOfLife);
 
         return Page();
     }

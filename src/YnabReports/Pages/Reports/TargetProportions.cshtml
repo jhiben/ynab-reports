@@ -37,6 +37,22 @@
     </div>
 </form>
 
+@if (Model.Report.IsDrilledDown)
+{
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item">
+                <a asp-page="/Reports/TargetProportions"
+                   asp-route-BudgetId="@Model.BudgetId"
+                   asp-route-GroupByCategory="true">
+                    All Groups
+                </a>
+            </li>
+            <li class="breadcrumb-item active" aria-current="page">@Model.Report.CategoryGroupName</li>
+        </ol>
+    </nav>
+}
+
 @if (!Model.Report.HasData)
 {
     <div class="alert alert-info">
@@ -56,20 +72,41 @@ else
                         <th></th>
                         <th>Name</th>
                         <th class="text-end">Monthly Target</th>
+                        <th class="text-end">Hours of Life</th>
+                        <th class="text-end">% of Income</th>
                         <th class="text-end">% of Total</th>
                     </tr>
                 </thead>
                 <tbody>
+                    @{ var rowIndex = 0; }
                     @foreach (var item in Model.Report.Items)
                     {
-                        <tr>
+                        <tr data-index="@rowIndex">
                             <td>
                                 <span class="color-swatch" style="background-color: @item.Color;"></span>
                             </td>
-                            <td>@item.Name</td>
+                            @if (Model.GroupByCategory && !Model.Report.IsDrilledDown)
+                            {
+                                <td>
+                                    <a asp-page="/Reports/TargetProportions"
+                                       asp-route-BudgetId="@Model.BudgetId"
+                                       asp-route-GroupByCategory="true"
+                                       asp-route-CategoryGroup="@item.Name"
+                                       class="text-decoration-none">
+                                        @item.Name
+                                    </a>
+                                </td>
+                            }
+                            else
+                            {
+                                <td>@item.Name</td>
+                            }
                             <td class="text-end">@item.TargetAmount.ToString("C2")</td>
+                            <td class="text-end">@item.HoursOfLife.ToString("F1")h</td>
+                            <td class="text-end">@item.PercentageOfIncome.ToString("F1")%</td>
                             <td class="text-end">@item.Percentage.ToString("F1")%</td>
                         </tr>
+                        rowIndex++;
                     }
                 </tbody>
                 <tfoot>
@@ -77,6 +114,8 @@ else
                         <td></td>
                         <td>Total</td>
                         <td class="text-end">@Model.Report.TotalTarget.ToString("C2")</td>
+                        <td class="text-end">@Model.Report.TotalHoursOfLife.ToString("F1")h</td>
+                        <td class="text-end">@Model.Report.Items.Sum(i => i.PercentageOfIncome).ToString("F1")%</td>
                         <td class="text-end">100.0%</td>
                     </tr>
                 </tfoot>
@@ -93,7 +132,7 @@ else
                 Model.Report.Items.Select(i => new { i.Name, i.TargetAmount, i.Percentage, i.Color })));
 
             const ctx = document.getElementById('proportionChart').getContext('2d');
-            new Chart(ctx, {
+            const chart = new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: chartData.map(d => d.Name),
@@ -107,6 +146,9 @@ else
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
+                    layout: {
+                        padding: 0
+                    },
                     plugins: {
                         legend: {
                             display: false
@@ -123,8 +165,36 @@ else
                                 }
                             }
                         }
+                    },
+                    onHover: function (event, elements) {
+                        const rows = document.querySelectorAll('.table-container tbody tr[data-index]');
+                        rows.forEach(r => r.classList.remove('highlight'));
+                        if (elements.length > 0) {
+                            const idx = elements[0].index;
+                            const row = document.querySelector(`tr[data-index="${idx}"]`);
+                            if (row) row.classList.add('highlight');
+                        }
                     }
                 }
+            });
+
+            // Table row hover → highlight chart segment
+            const rows = document.querySelectorAll('.table-container tbody tr[data-index]');
+            rows.forEach(row => {
+                row.addEventListener('mouseenter', () => {
+                    const idx = parseInt(row.dataset.index);
+                    chart.setActiveElements([{ datasetIndex: 0, index: idx }]);
+                    chart.tooltip.setActiveElements([{ datasetIndex: 0, index: idx }], { x: 0, y: 0 });
+                    chart.update();
+                    rows.forEach(r => r.classList.remove('highlight'));
+                    row.classList.add('highlight');
+                });
+                row.addEventListener('mouseleave', () => {
+                    chart.setActiveElements([]);
+                    chart.tooltip.setActiveElements([], { x: 0, y: 0 });
+                    chart.update();
+                    row.classList.remove('highlight');
+                });
             });
         </script>
     }
