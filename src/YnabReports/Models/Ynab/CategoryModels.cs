@@ -73,6 +73,12 @@ public class Category
     [JsonPropertyName("goal_cadence_frequency")]
     public int? GoalCadenceFrequency { get; set; }
 
+    [JsonPropertyName("activity")]
+    public long Activity { get; set; }
+
+    [JsonPropertyName("balance")]
+    public long Balance { get; set; }
+
     [JsonPropertyName("hidden")]
     public bool Hidden { get; set; }
 

@@ -1,0 +1,169 @@
+@page
+@model YnabReports.Pages.Reports.ValuesAlignmentModel
+@{
+    ViewData["Title"] = "Values Alignment";
+}
+
+<h2 class="mb-4">Values Alignment</h2>
+
+<form method="get" class="row mb-4 align-items-end">
+    <div class="col-auto">
+        <label for="BudgetId" class="form-label">Budget</label>
+        <select name="BudgetId" id="BudgetId" class="form-select"
+                onchange="this.form.submit()"
+                @(Model.Report.Budgets.Count <= 1 ? "disabled" : "")>
+            @foreach (var budget in Model.Report.Budgets)
+            {
+                <option value="@budget.Id" selected="@(budget.Id == Model.BudgetId)">@budget.Name</option>
+            }
+        </select>
+    </div>
+</form>
+
+@if (!Model.Report.IsConfigured)
+{
+    <div class="alert alert-warning">
+        <strong>Configuration needed.</strong> Define your personal values in <code>appsettings.json</code> under
+        <code>ReportOptions.Values</code>. Each value needs a name, importance (1-5), and linked category names.
+        <pre class="mt-2 mb-0"><code>"Values": [
+  { "Name": "Health", "Importance": 5, "Categories": ["Groceries", "Gym"] },
+  { "Name": "Freedom", "Importance": 4, "Categories": ["Savings", "Investments"] }
+]</code></pre>
+    </div>
+}
+else if (!Model.Report.HasData)
+{
+    <div class="alert alert-info">
+        <strong>No data available.</strong> No categories with targets found.
+    </div>
+}
+else
+{
+    <!-- Alignment Score -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Alignment Score</h6>
+                    <h1 class="display-4 mb-0 @(Model.Report.AlignmentScore >= 70 ? "text-success" : Model.Report.AlignmentScore >= 40 ? "text-warning" : "text-danger")">
+                        @Model.Report.AlignmentScore.ToString("F0")
+                    </h1>
+                    <small class="text-muted">out of 100</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8">
+            <div class="chart-container">
+                <canvas id="radarChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details Table -->
+    <table class="table table-striped table-hover">
+        <thead>
+            <tr>
+                <th>Value</th>
+                <th class="text-center">Importance</th>
+                <th class="text-end">Spending</th>
+                <th class="text-end">Spending %</th>
+                <th class="text-end">Importance %</th>
+                <th class="text-end">Gap</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Report.Items)
+            {
+                <tr>
+                    <td>
+                        <strong>@item.ValueName</strong>
+                        <br/>
+                        <small class="text-muted">@string.Join(", ", item.LinkedCategories)</small>
+                    </td>
+                    <td class="text-center">
+                        @for (int i = 0; i < item.Importance; i++) { <span>★</span> }
+                        @for (int i = item.Importance; i < 5; i++) { <span class="text-muted">☆</span> }
+                    </td>
+                    <td class="text-end">@item.SpendingAmount.ToString("C2")</td>
+                    <td class="text-end">@item.SpendingPercent.ToString("F1")%</td>
+                    <td class="text-end">@item.ImportancePercent.ToString("F1")%</td>
+                    <td class="text-end @(Math.Abs(item.Gap) <= 5 ? "text-success" : "text-warning")">
+                        @(item.Gap > 0 ? "+" : "")@item.Gap.ToString("F1")%
+                    </td>
+                    <td>
+                        @if (item.GapDescription == "Aligned")
+                        {
+                            <span class="badge bg-success">Aligned</span>
+                        }
+                        else if (item.GapDescription == "Underspending")
+                        {
+                            <span class="badge bg-warning text-dark">Underspending</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-info">Overspending</span>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @if (Model.Report.UnmappedSpending > 0)
+    {
+        <div class="alert alert-light mt-3">
+            <strong>@Model.Report.UnmappedSpending.ToString("C2")</strong> of monthly targets are not mapped to any value.
+            Consider linking more categories to your values in the configuration.
+        </div>
+    }
+}
+
+@section Scripts {
+    @if (Model.Report.HasData)
+    {
+        <script>
+            const items = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Report.Items.Select(i => new { i.ValueName, i.SpendingPercent, i.ImportancePercent })));
+
+            const ctx = document.getElementById('radarChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'radar',
+                data: {
+                    labels: items.map(i => i.ValueName),
+                    datasets: [
+                        {
+                            label: 'Spending %',
+                            data: items.map(i => i.SpendingPercent),
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            pointBackgroundColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Importance %',
+                            data: items.map(i => i.ImportancePercent),
+                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            pointBackgroundColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    },
+                    scales: {
+                        r: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 10 }
+                        }
+                    }
+                }
+            });
+        </script>
+    }
+}

@@ -44,4 +44,30 @@ public class YnabApiClient : IYnabApiClient
             })
             .ToList();
     }
+
+    public async Task<BudgetMonthDetail> GetBudgetMonthAsync(string budgetId, string month)
+    {
+        var response = await _httpClient.GetAsync($"budgets/{budgetId}/months/{month}");
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<BudgetMonthDetailResponse>();
+        var detail = result?.Data.Month ?? new BudgetMonthDetail();
+
+        detail.Categories = detail.Categories
+            .Where(c => !c.Hidden && !c.Deleted)
+            .ToList();
+
+        return detail;
+    }
+
+    public async Task<List<BudgetMonthSummary>> GetBudgetMonthsAsync(string budgetId)
+    {
+        var response = await _httpClient.GetAsync($"budgets/{budgetId}/months");
+        response.EnsureSuccessStatusCode();
+
+        var result = await response.Content.ReadFromJsonAsync<BudgetMonthsResponse>();
+        return result?.Data.Months
+            .Where(m => !m.Deleted)
+            .ToList() ?? [];
+    }
 }

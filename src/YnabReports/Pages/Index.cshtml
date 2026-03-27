@@ -1,10 +1,121 @@
 ﻿@page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home page";
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<h2 class="mb-4">Cost of Life Dashboard</h2>
+
+@if (!Model.Dashboard.HasData)
+{
+    <div class="alert alert-info">
+        <strong>No data available.</strong> Connect your YNAB budget to see your financial overview.
+    </div>
+}
+else
+{
+    <p class="text-muted mb-4">Budget: <strong>@Model.Dashboard.BudgetName</strong></p>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Monthly Commitments</h6>
+                    <h3 class="card-title mb-0">@Model.Dashboard.TotalMonthlyCommitments.ToString("C0")</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Hours of Life</h6>
+                    <h3 class="card-title mb-0">@Model.Dashboard.HoursOfLifeCommitted.ToString("F0")h</h3>
+                    <small class="text-muted">at @Model.Dashboard.HourlyRate.ToString("C0")/h</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">% of Income</h6>
+                    <h3 class="card-title mb-0">@Model.Dashboard.PercentOfIncomeCommitted.ToString("F1")%</h3>
+                    <small class="text-muted">of @Model.Dashboard.MonthlyIncome.ToString("C0")</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h6 class="card-subtitle mb-2 text-muted">Unallocated</h6>
+                    <h3 class="card-title mb-0 @(Model.Dashboard.UnallocatedIncome >= 0 ? "text-success" : "text-danger")">
+                        @Model.Dashboard.UnallocatedIncome.ToString("C0")
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Income bar -->
+    <div class="mb-4">
+        <h5>Income Allocation</h5>
+        <div class="progress" style="height: 30px;">
+            @{
+                var committedPct = Math.Min(Model.Dashboard.PercentOfIncomeCommitted, 100);
+                var freePct = 100 - committedPct;
+            }
+            <div class="progress-bar bg-primary" style="width: @committedPct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%">
+                @committedPct.ToString("F0")% committed
+            </div>
+            @if (freePct > 0)
+            {
+                <div class="progress-bar bg-success" style="width: @freePct.ToString("F1", System.Globalization.CultureInfo.InvariantCulture)%">
+                    @freePct.ToString("F0")% free
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Top expenses -->
+    <h5 class="mb-3">Top Expenses</h5>
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Category</th>
+                    <th class="text-end">Monthly</th>
+                    <th class="text-end">Hours of Life</th>
+                    <th class="text-end">% of Income</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Dashboard.TopExpenses)
+                {
+                    <tr>
+                        <td><span class="color-swatch" style="background-color: @item.Color;"></span></td>
+                        <td>@item.Name</td>
+                        <td class="text-end">@item.Amount.ToString("C2")</td>
+                        <td class="text-end">@item.HoursOfLife.ToString("F1")h</td>
+                        <td class="text-end">@item.PercentOfIncome.ToString("F1")%</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Quick links -->
+    <div class="row g-3 mt-2">
+        <div class="col-auto">
+            <a asp-page="/Reports/TargetProportions" class="btn btn-outline-primary">View All Targets →</a>
+        </div>
+        <div class="col-auto">
+            <a asp-page="/Reports/NeedsWants" class="btn btn-outline-primary">Needs vs Wants →</a>
+        </div>
+        <div class="col-auto">
+            <a asp-page="/Reports/ActualVsTarget" class="btn btn-outline-primary">Actual vs Target →</a>
+        </div>
+        <div class="col-auto">
+            <a asp-page="/Reports/ValuesAlignment" class="btn btn-outline-primary">Values Alignment →</a>
+        </div>
+    </div>
+}

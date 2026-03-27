@@ -25,6 +25,10 @@ builder.Services.AddHttpClient<IYnabApiClient, YnabApiClient>(client =>
 }).AddHttpMessageHandler<YnabAuthHandler>();
 
 builder.Services.AddSingleton<TargetProportionCalculator>();
+builder.Services.AddSingleton<NeedsWantsCalculator>();
+builder.Services.AddSingleton<ActualVsTargetCalculator>();
+builder.Services.AddSingleton<SpendingTrendsCalculator>();
+builder.Services.AddSingleton<ValuesAlignmentCalculator>();
 
 // Report options (category exclusions)
 builder.Services.Configure<ReportOptions>(
