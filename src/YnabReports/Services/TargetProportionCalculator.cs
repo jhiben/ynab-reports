@@ -1,4 +1,6 @@
 using System.Globalization;
+using Microsoft.Extensions.Options;
+using YnabReports.Configuration;
 using YnabReports.Models.Ynab;
 using YnabReports.Models.ViewModels;
 
@@ -6,6 +8,8 @@ namespace YnabReports.Services;
 
 public class TargetProportionCalculator
 {
+    private readonly IOptionsMonitor<ReportOptions> _reportOptions;
+
     private static readonly string[] ChartColors =
     [
         "#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF",
@@ -13,6 +17,38 @@ public class TargetProportionCalculator
         "#DBAD6A", "#6C8EBF", "#D4A5A5", "#9ED2C6", "#FFB6C1",
         "#B0E0E6", "#DDA0DD", "#F0E68C", "#98D8C8", "#F7DC6F"
     ];
+
+    public TargetProportionCalculator(IOptionsMonitor<ReportOptions> reportOptions)
+    {
+        _reportOptions = reportOptions;
+    }
+
+    /// <summary>
+    /// Applies configured exclusions: removes entire groups by name and individual categories by name.
+    /// </summary>
+    private List<CategoryGroupWithCategories> ApplyExclusions(List<CategoryGroupWithCategories> groups)
+    {
+        var options = _reportOptions.CurrentValue;
+        var excludedGroups = new HashSet<string>(options.ExcludedCategoryGroups, StringComparer.OrdinalIgnoreCase);
+        var excludedCategories = new HashSet<string>(options.ExcludedCategories, StringComparer.OrdinalIgnoreCase);
+
+        if (excludedGroups.Count == 0 && excludedCategories.Count == 0)
+            return groups;
+
+        return groups
+            .Where(g => !excludedGroups.Contains(g.Name))
+            .Select(g => new CategoryGroupWithCategories
+            {
+                Id = g.Id,
+                Name = g.Name,
+                Hidden = g.Hidden,
+                Deleted = g.Deleted,
+                Categories = g.Categories
+                    .Where(c => !excludedCategories.Contains(c.Name))
+                    .ToList()
+            })
+            .ToList();
+    }
 
     /// <summary>
     /// Normalizes a category's goal target to a monthly amount (in milliunits).
@@ -79,7 +115,8 @@ public class TargetProportionCalculator
     public List<TargetProportionItem> CalculateSubcategoryProportions(
         List<CategoryGroupWithCategories> groups)
     {
-        var items = groups
+        var filtered = ApplyExclusions(groups);
+        var items = filtered
             .SelectMany(g => g.Categories)
             .Select(c => (c.Name, Monthly: NormalizeToMonthly(c)))
             .Where(x => x.Monthly.HasValue)
@@ -95,7 +132,8 @@ public class TargetProportionCalculator
     public List<TargetProportionItem> CalculateCategoryGroupProportions(
         List<CategoryGroupWithCategories> groups)
     {
-        var groupTotals = groups
+        var filtered = ApplyExclusions(groups);
+        var groupTotals = filtered
             .Select(g => (
                 Name: g.Name,
                 Total: g.Categories

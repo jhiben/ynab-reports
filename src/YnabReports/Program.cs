@@ -26,6 +26,10 @@ builder.Services.AddHttpClient<IYnabApiClient, YnabApiClient>(client =>
 
 builder.Services.AddSingleton<TargetProportionCalculator>();
 
+// Report options (category exclusions)
+builder.Services.Configure<ReportOptions>(
+    builder.Configuration.GetSection(ReportOptions.SectionName));
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
