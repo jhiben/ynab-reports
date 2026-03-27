@@ -1,0 +1,131 @@
+@page
+@model YnabReports.Pages.Reports.TargetProportionsModel
+@{
+    ViewData["Title"] = "Target Proportions";
+}
+
+<h2 class="mb-4">Target Proportions</h2>
+
+<form method="get" class="row mb-4 align-items-end">
+    <div class="col-auto">
+        <label for="BudgetId" class="form-label">Budget</label>
+        <select name="BudgetId" id="BudgetId" class="form-select"
+                onchange="this.form.submit()"
+                @(Model.Report.Budgets.Count <= 1 ? "disabled" : "")>
+            @foreach (var budget in Model.Report.Budgets)
+            {
+                <option value="@budget.Id" selected="@(budget.Id == Model.BudgetId)">@budget.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-auto">
+        <label class="form-label d-block">View</label>
+        <div class="btn-group" role="group">
+            <a asp-page="/Reports/TargetProportions"
+               asp-route-BudgetId="@Model.BudgetId"
+               asp-route-GroupByCategory="false"
+               class="btn @(!Model.GroupByCategory ? "btn-primary" : "btn-outline-primary")">
+                Subcategories
+            </a>
+            <a asp-page="/Reports/TargetProportions"
+               asp-route-BudgetId="@Model.BudgetId"
+               asp-route-GroupByCategory="true"
+               class="btn @(Model.GroupByCategory ? "btn-primary" : "btn-outline-primary")">
+                Category Groups
+            </a>
+        </div>
+    </div>
+</form>
+
+@if (!Model.Report.HasData)
+{
+    <div class="alert alert-info">
+        <strong>No target data available.</strong> The selected budget has no subcategories with targets set.
+    </div>
+}
+else
+{
+    <div class="report-layout">
+        <div class="chart-container">
+            <canvas id="proportionChart"></canvas>
+        </div>
+        <div class="table-container">
+            <table class="table table-striped table-hover">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>Name</th>
+                        <th class="text-end">Monthly Target</th>
+                        <th class="text-end">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in Model.Report.Items)
+                    {
+                        <tr>
+                            <td>
+                                <span class="color-swatch" style="background-color: @item.Color;"></span>
+                            </td>
+                            <td>@item.Name</td>
+                            <td class="text-end">@item.TargetAmount.ToString("C2")</td>
+                            <td class="text-end">@item.Percentage.ToString("F1")%</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td></td>
+                        <td>Total</td>
+                        <td class="text-end">@Model.Report.TotalTarget.ToString("C2")</td>
+                        <td class="text-end">100.0%</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    @if (Model.Report.HasData)
+    {
+        <script>
+            const chartData = @Html.Raw(System.Text.Json.JsonSerializer.Serialize(
+                Model.Report.Items.Select(i => new { i.Name, i.TargetAmount, i.Percentage, i.Color })));
+
+            const ctx = document.getElementById('proportionChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: chartData.map(d => d.Name),
+                    datasets: [{
+                        data: chartData.map(d => d.TargetAmount),
+                        backgroundColor: chartData.map(d => d.Color),
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    const item = chartData[context.dataIndex];
+                                    const amount = new Intl.NumberFormat(undefined, {
+                                        style: 'currency',
+                                        currency: 'USD'
+                                    }).format(item.TargetAmount);
+                                    return `${item.Name}: ${amount} (${item.Percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        </script>
+    }
+}
